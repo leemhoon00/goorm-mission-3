@@ -5,4 +5,4 @@
 
 ## 구현 (with terraform)
 
-![goorm-mission-3 drawio](https://github.com/leemhoon00/goorm-mission-3/assets/57895643/e5b3344f-c28b-444d-b54b-9b737798de86)
+![goorm-mission-3 drawio](https://github.com/leemhoon00/goorm-mission-3/assets/57895643/cef52ec8-80e2-462b-b868-d7cb2d5940aa)

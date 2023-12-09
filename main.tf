@@ -18,6 +18,29 @@ provider "aws" {
   region = "ap-northeast-2"
 }
 
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+}
+
+locals {
+  availability_zones = ["ap-northeast-2a", "ap-northeast-2c"]
+}
+
+module "az-network" {
+  for_each = toset(local.availability_zones)
+  source   = "./modules/az-network"
+
+  vpc_id              = aws_vpc.main.id
+  vpc_cidr_block      = aws_vpc.main.cidr_block
+  internet_gateway_id = aws_internet_gateway.main.id
+  index               = index(local.availability_zones, each.value)
+  availability_zone   = each.value
+}
+
 resource "aws_security_group" "open" {
   name        = "goorm-mission-3-open"
   description = "Allow all traffic"
@@ -51,7 +74,7 @@ resource "aws_autoscaling_group" "nginx" {
   max_size             = 2
   desired_capacity     = 2
   launch_configuration = aws_launch_configuration.nginx.name
-  vpc_zone_identifier  = [aws_subnet.private-a.id, aws_subnet.private-c.id]
+  vpc_zone_identifier  = [for subnet in module.az-network : subnet.private_subnet_id]
 }
 
 resource "aws_lb" "nginx" {
@@ -59,7 +82,7 @@ resource "aws_lb" "nginx" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.open.id]
-  subnets            = [aws_subnet.public-a.id, aws_subnet.public-c.id]
+  subnets            = [for subnet in module.az-network : subnet.public_subnet_id]
 }
 
 resource "aws_lb_listener" "nginx" {

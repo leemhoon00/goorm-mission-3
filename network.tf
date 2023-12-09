@@ -7,18 +7,6 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 }
 
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-  route {
-    cidr_block = aws_vpc.main.cidr_block
-    gateway_id = "local"
-  }
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-}
-
 resource "aws_subnet" "public-a" {
   availability_zone = "ap-northeast-2a"
   vpc_id            = aws_vpc.main.id
@@ -31,6 +19,18 @@ resource "aws_subnet" "public-c" {
   cidr_block        = "10.0.2.0/24"
 }
 
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+  route {
+    cidr_block = aws_vpc.main.cidr_block
+    gateway_id = "local"
+  }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+}
+
 resource "aws_route_table_association" "public-a" {
   subnet_id      = aws_subnet.public-a.id
   route_table_id = aws_route_table.public.id
@@ -41,13 +41,22 @@ resource "aws_route_table_association" "public-c" {
   route_table_id = aws_route_table.public.id
 }
 
-resource "aws_eip" "public-a" {
+resource "aws_eip" "nat-a" {
+  domain = "vpc"
+}
+
+resource "aws_eip" "nat-c" {
   domain = "vpc"
 }
 
 resource "aws_nat_gateway" "public-a" {
-  allocation_id = aws_eip.public-a.id
+  allocation_id = aws_eip.nat-a.id
   subnet_id     = aws_subnet.public-a.id
+}
+
+resource "aws_nat_gateway" "public-c" {
+  allocation_id = aws_eip.nat-c.id
+  subnet_id     = aws_subnet.public-c.id
 }
 
 resource "aws_subnet" "private-a" {
@@ -62,7 +71,7 @@ resource "aws_subnet" "private-c" {
   cidr_block        = "10.0.4.0/24"
 }
 
-resource "aws_route_table" "private" {
+resource "aws_route_table" "private-a" {
   vpc_id = aws_vpc.main.id
 
   route {
@@ -76,12 +85,26 @@ resource "aws_route_table" "private" {
   }
 }
 
+resource "aws_route_table" "private-c" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = aws_vpc.main.cidr_block
+    gateway_id = "local"
+  }
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.public-c.id
+  }
+}
+
 resource "aws_route_table_association" "private-a" {
   subnet_id      = aws_subnet.private-a.id
-  route_table_id = aws_route_table.private.id
+  route_table_id = aws_route_table.private-a.id
 }
 
 resource "aws_route_table_association" "private-c" {
   subnet_id      = aws_subnet.private-c.id
-  route_table_id = aws_route_table.private.id
+  route_table_id = aws_route_table.private-c.id
 }

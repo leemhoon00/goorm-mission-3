@@ -35,65 +35,28 @@ module "network" {
   availability_zone   = each.value
 }
 
-resource "aws_security_group" "alb" {
-  name        = "goorm-mission-3-alb"
-  description = "Allow all traffic"
+module "security_group" {
+  source      = "./modules/security_group"
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port   = "80"
-    to_port     = "80"
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = "443"
-    to_port     = "443"
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress { // 왜 이거 없으면 안되는지 모르겠음
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  name_prefix = var.name
 }
 
 resource "aws_lb" "nginx" {
   name               = "goorm-mission-3"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
+  security_groups    = [module.security_group.alb_security_group_id]
   subnets            = [for subnet in module.network : subnet.public_subnet_id]
 }
 
-resource "aws_security_group" "asg" {
-  name        = "goorm-mission-3-asg"
-  description = "Allow all traffic"
-  vpc_id      = aws_vpc.main.id
-  ingress {
-    from_port       = "80"
-    to_port         = "80"
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
+
 
 resource "aws_launch_configuration" "nginx" {
   name            = var.name
   image_id        = var.image_id
   instance_type   = var.instance_type
   user_data       = filebase64("userdata.sh")
-  security_groups = [aws_security_group.asg.id]
+  security_groups = [module.security_group.asg_security_group_id]
 }
 
 resource "aws_autoscaling_group" "nginx" {

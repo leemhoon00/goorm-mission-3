@@ -11,9 +11,11 @@ variable "internet_gateway_id" {
 }
 
 variable "index" {
-  type = number
+  type    = number
+  default = 0
 }
 
 variable "availability_zone" {
-  type = string
+  type    = string
+  default = "a"
 }

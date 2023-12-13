@@ -7,8 +7,10 @@ terraform {
   }
 }
 
+data "aws_region" "current" {}
+
 resource "aws_subnet" "public" {
-  availability_zone = var.availability_zone
+  availability_zone = "${data.aws_region.current.name}${var.availability_zone}"
   vpc_id            = var.vpc_id
   cidr_block        = "10.0.${var.index * 2}.0/24"
 }
@@ -40,7 +42,7 @@ resource "aws_nat_gateway" "public" {
 }
 
 resource "aws_subnet" "private" {
-  availability_zone = var.availability_zone
+  availability_zone = "${data.aws_region.current.name}${var.availability_zone}"
   vpc_id            = var.vpc_id
   cidr_block        = "10.0.${var.index * 2 + 1}.0/24"
 }

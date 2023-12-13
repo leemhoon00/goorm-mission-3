@@ -26,18 +26,14 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 }
 
-locals {
-  availability_zones = ["ap-northeast-2a", "ap-northeast-2c"]
-}
-
 module "az-network" {
-  for_each = toset(local.availability_zones)
+  for_each = toset(var.availability_zones)
   source   = "./modules/az-network"
 
   vpc_id              = aws_vpc.main.id
   vpc_cidr_block      = aws_vpc.main.cidr_block
   internet_gateway_id = aws_internet_gateway.main.id
-  index               = index(local.availability_zones, each.value)
+  index               = index(var.availability_zones, each.value)
   availability_zone   = each.value
 }
 
@@ -104,9 +100,9 @@ resource "aws_launch_configuration" "nginx" {
 
 resource "aws_autoscaling_group" "nginx" {
   name                 = "goorm-mission-3"
-  min_size             = 2
-  max_size             = 2
-  desired_capacity     = 2
+  min_size             = var.min_size
+  max_size             = var.max_size
+  desired_capacity     = var.desired_capacity
   launch_configuration = aws_launch_configuration.nginx.name
   vpc_zone_identifier  = [for subnet in module.az-network : subnet.private_subnet_id]
 }

@@ -14,9 +14,7 @@ terraform {
   }
 }
 
-provider "aws" {
-  region = "ap-northeast-2"
-}
+provider "aws" {}
 
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
@@ -26,9 +24,9 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 }
 
-module "az-network" {
+module "network" {
   for_each = toset(var.availability_zones)
-  source   = "./modules/az-network"
+  source   = "./modules/network"
 
   vpc_id              = aws_vpc.main.id
   vpc_cidr_block      = aws_vpc.main.cidr_block
@@ -69,7 +67,7 @@ resource "aws_lb" "nginx" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = [for subnet in module.az-network : subnet.public_subnet_id]
+  subnets            = [for subnet in module.network : subnet.public_subnet_id]
 }
 
 resource "aws_security_group" "asg" {
@@ -91,20 +89,20 @@ resource "aws_security_group" "asg" {
 }
 
 resource "aws_launch_configuration" "nginx" {
-  name            = "goorm-mission-3"
-  image_id        = "ami-01123b84e2a4fba05"
-  instance_type   = "t3.micro"
+  name            = var.name
+  image_id        = var.image_id
+  instance_type   = var.instance_type
   user_data       = filebase64("userdata.sh")
   security_groups = [aws_security_group.asg.id]
 }
 
 resource "aws_autoscaling_group" "nginx" {
-  name                 = "goorm-mission-3"
+  name                 = var.name
   min_size             = var.min_size
   max_size             = var.max_size
   desired_capacity     = var.desired_capacity
   launch_configuration = aws_launch_configuration.nginx.name
-  vpc_zone_identifier  = [for subnet in module.az-network : subnet.private_subnet_id]
+  vpc_zone_identifier  = [for subnet in module.network : subnet.private_subnet_id]
 }
 
 resource "aws_lb_listener" "http" {
@@ -136,7 +134,7 @@ resource "aws_lb_listener" "https" {
 }
 
 resource "aws_lb_target_group" "nginx" {
-  name     = "goorm-mission-3"
+  name     = var.name
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id

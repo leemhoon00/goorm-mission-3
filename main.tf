@@ -41,16 +41,6 @@ module "security_group" {
   name_prefix = var.name
 }
 
-resource "aws_lb" "nginx" {
-  name               = "goorm-mission-3"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [module.security_group.alb_security_group_id]
-  subnets            = [for subnet in module.network : subnet.public_subnet_id]
-}
-
-
-
 resource "aws_launch_configuration" "nginx" {
   name            = var.name
   image_id        = var.image_id
@@ -68,34 +58,6 @@ resource "aws_autoscaling_group" "nginx" {
   vpc_zone_identifier  = [for subnet in module.network : subnet.private_subnet_id]
 }
 
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.nginx.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
-
-resource "aws_lb_listener" "https" {
-  load_balancer_arn = aws_lb.nginx.arn
-  port              = 443
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = var.certificate_arn
-
-  default_action {
-    target_group_arn = aws_lb_target_group.nginx.arn
-    type             = "forward"
-  }
-}
-
 resource "aws_lb_target_group" "nginx" {
   name     = var.name
   port     = 80
@@ -108,14 +70,23 @@ resource "aws_autoscaling_attachment" "nginx" {
   lb_target_group_arn    = aws_lb_target_group.nginx.arn
 }
 
+module "loadbalancer" {
+  source            = "./modules/loadbalancer"
+  name              = var.name
+  subnets           = [for subnet in module.network : subnet.public_subnet_id]
+  security_group_id = module.security_group.alb_security_group_id
+  certificate_arn   = var.certificate_arn
+  target_group_arn  = aws_lb_target_group.nginx.arn
+}
+
 resource "aws_route53_record" "nginx" {
   zone_id = var.zone_id
   name    = "nginx"
   type    = "A"
 
   alias {
-    name                   = aws_lb.nginx.dns_name
-    zone_id                = aws_lb.nginx.zone_id
+    name                   = module.loadbalancer.dns_name
+    zone_id                = module.loadbalancer.zone_id
     evaluate_target_health = true
   }
 }
